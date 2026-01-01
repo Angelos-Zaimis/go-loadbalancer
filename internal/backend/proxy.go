@@ -105,11 +105,11 @@ func (b *Backend) EWMATime() time.Duration {
 }
 
 // New creates a new Backend with the given URL.
-// The backend starts in a healthy state.
+// The backend starts in an unhealthy state until the first health check passes.
 func New(url *url.URL) *Backend {
 	return &Backend{
 		url:       url,
 		proxy:     httputil.NewSingleHostReverseProxy(url),
-		isHealthy: true,
+		isHealthy: false,
 	}
 }
