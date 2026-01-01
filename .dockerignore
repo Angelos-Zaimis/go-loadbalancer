@@ -1,0 +1,47 @@
+# Build artifacts
+build/
+*.exe
+*.dll
+*.so
+*.dylib
+load-balancer
+load_balancer
+
+# Test files
+*_test.go
+coverage.out
+coverage.html
+*.test
+
+# Documentation
+README.md
+TODO.md
+ROADMAP.md
+ARCHITECTURE.md
+CONTRIBUTING.md
+BENCHMARKS.md
+*.md
+
+# Git
+.git/
+.gitignore
+.github/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Scripts and test data
+scripts/
+results.csv
+summary.json
+
+# CI/CD
+.github/

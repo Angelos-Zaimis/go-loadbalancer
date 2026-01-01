@@ -1,0 +1,14 @@
+# Configuration defaults - override with environment variables
+ENV: dev
+HTTP_ADDR: ":8080"
+HEALTH_CHECK_INTERVAL: "2s"
+BACKENDS: [   
+    "http://localhost:8081",
+    "http://localhost:8082",
+    "http://localhost:8083",
+    "http://localhost:8084",
+    "http://localhost:8085"
+]
+STRATEGY: "consistent_hash"
+LOG_LEVEL: "debug"
+VIRTUAL_NODES: 200
