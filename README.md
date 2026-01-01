@@ -1,10 +1,5 @@
 # Load Balancer
 
-![CI](https://github.com/angeloszaimis/load-balancer/workflows/CI/badge.svg)
-[![Go Report Card](https://goreportcard.com/badge/github.com/angeloszaimis/load-balancer)](https://goreportcard.com/report/github.com/angeloszaimis/load-balancer)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Go Version](https://img.shields.io/github/go-mod/go-version/angeloszaimis/load-balancer)](https://go.dev/)
-
 A production-grade HTTP load balancer written in Go. Implements multiple load balancing strategies, active health checking, and graceful shutdown. Built to demonstrate clean Go architecture and production-ready patterns.
 
 ## Features
@@ -158,21 +153,6 @@ make test-race      # Run with race detector
 
 Current test coverage: 76.3%
 
-## Performance
-
-Benchmark results (MacBook Pro M1, 8 backends):
-
-| Strategy | Requests/sec | P50 Latency | P99 Latency |
-|----------|-------------|-------------|-------------|
-| Round Robin | 45,000 | 2ms | 8ms |
-| Least Connections | 43,000 | 2ms | 9ms |
-| Least Response Time | 44,500 | 2ms | 8ms |
-| IP Hash | 45,200 | 2ms | 7ms |
-| Random | 44,800 | 2ms | 8ms |
-| Weighted RR | 42,000 | 2ms | 10ms |
-
-The load balancer handles ~45k req/s with minimal overhead. Strategy choice has minor impact on throughput but can significantly affect distribution fairness.
-
 ## Deployment
 
 ### Docker
@@ -192,43 +172,6 @@ Run with demo backends:
 make docker-up
 # Load balancer on :8080, backends on :8081-8083
 ```
-
-### Kubernetes
-
-Example deployment:
-
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: load-balancer
-spec:
-  replicas: 3
-  selector:
-    matchLabels:
-      app: load-balancer
-  template:
-    metadata:
-      labels:
-        app: load-balancer
-    spec:
-      containers:
-      - name: load-balancer
-        image: load-balancer:latest
-        ports:
-        - containerPort: 8080
-        env:
-        - name: STRATEGY
-          value: "least-conn"
-        volumeMounts:
-        - name: config
-          mountPath: /app/config
-      volumes:
-      - name: config
-        configMap:
-          name: lb-config
-```
-
 ## Makefile Targets
 
 ```bash
