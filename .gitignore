@@ -74,3 +74,6 @@ temp/
 test*.csv
 results*.csv
 summary.json
+
+# Copilot instructions (keep local only)
+.github/copilot-instructions.md
