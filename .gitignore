@@ -74,3 +74,6 @@ temp/
 test*.csv
 results*.csv
 summary.json
+
+copilot-instructions.md
+backend.pids
