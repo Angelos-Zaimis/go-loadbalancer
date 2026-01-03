@@ -25,26 +25,52 @@ const (
 	LogLevelError = "error"
 )
 
+// ServerConfig holds server-specific configuration.
+type ServerConfig struct {
+	Address     string `mapstructure:"address"`
+	Environment string `mapstructure:"environment"`
+}
+
+// HealthCheckConfig holds health check configuration.
+type HealthCheckConfig struct {
+	Interval string `mapstructure:"interval"`
+}
+
+// StrategyConfig holds load balancing strategy configuration.
+type StrategyConfig struct {
+	Type         string `mapstructure:"type"`
+	VirtualNodes int    `mapstructure:"virtual_nodes"`
+}
+
+// BackendConfig represents a single backend server configuration.
+type BackendConfig struct {
+	URL    string `mapstructure:"url"`
+	Weight int    `mapstructure:"weight"`
+}
+
+// LoggingConfig holds logging configuration.
+type LoggingConfig struct {
+	Level string `mapstructure:"level"`
+}
+
 // Config holds the application configuration loaded from YAML or environment variables.
 type Config struct {
-	Env                 string   `mapstructure:"ENV"`
-	HTTPAddr            string   `mapstructure:"HTTP_ADDR"`
-	LogLevel            string   `mapstructure:"LOG_LEVEL"`
-	HealthCheckInterval string   `mapstructure:"HEALTH_CHECK_INTERVAL"`
-	Backends            []string `mapstructure:"BACKENDS"`
-	Strategy            string   `mapstructure:"STRATEGY"`
-	VirtualNodes        int      `mapstructure:"VIRTUAL_NODES"`
+	Server      ServerConfig      `mapstructure:"server"`
+	HealthCheck HealthCheckConfig `mapstructure:"health_check"`
+	Strategy    StrategyConfig    `mapstructure:"strategy"`
+	Backends    []BackendConfig   `mapstructure:"backends"`
+	Logging     LoggingConfig     `mapstructure:"logging"`
 }
 
 // Load reads configuration from config.yaml and environment variables.
 // Environment variables take precedence over file configuration.
 func Load() (*Config, error) {
-	viper.SetDefault("ENV", EnvDev)
-	viper.SetDefault("HTTP_ADDR", ":8080")
-	viper.SetDefault("HEALTH_CHECK_INTERVAL", "2s")
-	viper.SetDefault("BACKENDS", "")
-	viper.SetDefault("STRATEGY", "round-robin")
-	viper.SetDefault("VIRTUAL_NODES", "100")
+	viper.SetDefault("server.environment", EnvDev)
+	viper.SetDefault("server.address", ":8080")
+	viper.SetDefault("health_check.interval", "2s")
+	viper.SetDefault("strategy.type", "round-robin")
+	viper.SetDefault("strategy.virtual_nodes", 100)
+	viper.SetDefault("logging.level", LogLevelInfo)
 
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
@@ -80,34 +106,78 @@ func Load() (*Config, error) {
 
 func (c *Config) Validate() error {
 	return validation.ValidateStruct(c,
-		validation.Field(&c.Env,
+		validation.Field(&c.Server,
 			validation.Required,
-			validation.In(EnvDev, EnvStaging, EnvProd),
+			validation.By(func(value interface{}) error {
+				sc, ok := value.(ServerConfig)
+				if !ok {
+					return validation.NewError("validation_invalid_type", "must be a ServerConfig")
+				}
+				return validation.ValidateStruct(&sc,
+					validation.Field(&sc.Environment,
+						validation.Required,
+						validation.In(EnvDev, EnvStaging, EnvProd),
+					),
+					validation.Field(&sc.Address,
+						validation.Required,
+						validation.By(validateHostPort),
+					),
+				)
+			}),
 		),
-		validation.Field(&c.HTTPAddr,
+		validation.Field(&c.Logging,
 			validation.Required,
-			validation.By(validateHostPort),
+			validation.By(func(value interface{}) error {
+				lc, ok := value.(LoggingConfig)
+				if !ok {
+					return validation.NewError("validation_invalid_type", "must be a LoggingConfig")
+				}
+				return validation.ValidateStruct(&lc,
+					validation.Field(&lc.Level,
+						validation.Required,
+						validation.In(LogLevelDebug, LogLevelInfo, LogLevelWarn, LogLevelError),
+					),
+				)
+			}),
 		),
-		validation.Field(&c.LogLevel,
+		validation.Field(&c.HealthCheck,
 			validation.Required,
-			validation.In(LogLevelDebug, LogLevelInfo, LogLevelWarn, LogLevelError),
-		),
-		validation.Field(&c.HealthCheckInterval,
-			validation.Required,
-			validation.By(validateDuration),
+			validation.By(func(value interface{}) error {
+				hc, ok := value.(HealthCheckConfig)
+				if !ok {
+					return validation.NewError("validation_invalid_type", "must be a HealthCheckConfig")
+				}
+				return validation.ValidateStruct(&hc,
+					validation.Field(&hc.Interval,
+						validation.Required,
+						validation.By(validateDuration),
+					),
+				)
+			}),
 		),
 		validation.Field(&c.Backends,
 			validation.Required,
 			validation.Length(1, 0),
-			validation.Each(validation.By(validateServerURL)),
+			validation.Each(validation.By(validateBackendConfig)),
 		),
 		validation.Field(&c.Strategy,
 			validation.Required,
-			validation.In("round-robin", "least-conn", "least-response", "random", "consistent_hash", "weighted-round-robin"),
-		),
-		validation.Field(&c.VirtualNodes,
-			validation.Required,
-			validation.Min(1),
+			validation.By(func(value interface{}) error {
+				sc, ok := value.(StrategyConfig)
+				if !ok {
+					return validation.NewError("validation_invalid_type", "must be a StrategyConfig")
+				}
+				return validation.ValidateStruct(&sc,
+					validation.Field(&sc.Type,
+						validation.Required,
+						validation.In("round-robin", "least-conn", "least-response", "random", "consistent_hash", "weighted-round-robin"),
+					),
+					validation.Field(&sc.VirtualNodes,
+						validation.Required,
+						validation.Min(1),
+					),
+				)
+			}),
 		),
 	)
 }
@@ -170,6 +240,36 @@ func validateServerURL(value interface{}) error {
 
 	if parsedURL.Host == "" {
 		return validation.NewError("validation_missing_host", "URL must have a host")
+	}
+
+	return nil
+}
+
+func validateBackendConfig(value interface{}) error {
+	backend, ok := value.(BackendConfig)
+	if !ok {
+		return validation.NewError("validation_invalid_type", "must be a BackendConfig")
+	}
+
+	if backend.URL == "" {
+		return validation.NewError("validation_empty_url", "backend URL cannot be empty")
+	}
+
+	parsedURL, err := url.Parse(backend.URL)
+	if err != nil {
+		return validation.NewError("validation_invalid_url", "must be a valid URL")
+	}
+
+	if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
+		return validation.NewError("validation_invalid_scheme", "URL must use http or https scheme")
+	}
+
+	if parsedURL.Host == "" {
+		return validation.NewError("validation_missing_host", "URL must have a host")
+	}
+
+	if backend.Weight < 1 {
+		return validation.NewError("validation_invalid_weight", "weight must be at least 1")
 	}
 
 	return nil

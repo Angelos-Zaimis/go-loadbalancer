@@ -15,6 +15,7 @@ type Backend struct {
 	mutex             sync.Mutex
 	isHealthy         bool
 	activeConnections int
+	weight            int
 	ewmaResponseTime  time.Duration
 	hasEWMA           bool
 }
@@ -67,7 +68,6 @@ func (b *Backend) IsHealthy() bool {
 func (b *Backend) SetHealthy(healthy bool) (changed bool) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
-
 	if b.isHealthy == healthy {
 		return false
 	}
@@ -104,12 +104,17 @@ func (b *Backend) EWMATime() time.Duration {
 	return b.ewmaResponseTime
 }
 
+func (b *Backend) Weight() int {
+	return b.weight
+}
+
 // New creates a new Backend with the given URL.
 // The backend starts in an unhealthy state until the first health check passes.
-func New(url *url.URL) *Backend {
+func New(url *url.URL, weight int) *Backend {
 	return &Backend{
 		url:       url,
 		proxy:     httputil.NewSingleHostReverseProxy(url),
 		isHealthy: false,
+		weight: weight,
 	}
 }

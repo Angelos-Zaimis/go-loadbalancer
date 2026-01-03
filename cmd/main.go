@@ -27,7 +27,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	log := logger.New(cfg.LogLevel, true, cfg.Env)
+	log := logger.New(cfg.Logging.Level, true, cfg.Server.Environment)
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
@@ -38,10 +38,10 @@ func main() {
 		os.Exit(1)
 	}
 
-	strat, err := createStrategy(log, cfg.Strategy, cfg.VirtualNodes)
+	strat, err := createStrategy(log, cfg.Strategy.Type, cfg.Strategy.VirtualNodes)
 	if err != nil {
 		log.Error("Failed to create strategy",
-			slog.String("strategy", cfg.Strategy),
+			slog.String("strategy", cfg.Strategy.Type),
 			slog.Any("err", err))
 		os.Exit(1)
 	}
@@ -50,7 +50,7 @@ func main() {
 
 	loadBalancerHandler := handler.NewLoadBalancerHandler(log, lb, backends)
 
-	srv, err := httpserver.New(cfg.HTTPAddr, http.HandlerFunc(loadBalancerHandler.ServeHTTP))
+	srv, err := httpserver.New(cfg.Server.Address, http.HandlerFunc(loadBalancerHandler.ServeHTTP))
 	if err != nil {
 		log.Error("Failed to create server", slog.Any("err", err))
 		os.Exit(1)
@@ -77,24 +77,24 @@ func main() {
 }
 
 func initializeBackends(ctx context.Context, cfg *config.Config, log *slog.Logger) ([]*backend.Backend, error) {
-	healthCheckInterval, err := time.ParseDuration(cfg.HealthCheckInterval)
+	healthCheckInterval, err := time.ParseDuration(cfg.HealthCheck.Interval)
 	if err != nil {
 		return nil, err
 	}
 
 	var backends []*backend.Backend
 
-	for _, serverUrl := range cfg.Backends {
-		u, err := url.Parse(serverUrl)
+	for _, backendCfg := range cfg.Backends {
+		u, err := url.Parse(backendCfg.URL)
 
 		if err != nil {
 			log.Error("Failed to parse URL",
-				slog.String("url", serverUrl),
+				slog.String("url", backendCfg.URL),
 				slog.String("error", err.Error()))
 			continue
 		}
 
-		backend := backend.New(u)
+		backend := backend.New(u, backendCfg.Weight)
 		backends = append(backends, backend)
 		go healthcheck.HealthCheck(ctx, backend, healthCheckInterval, log)
 	}
@@ -119,7 +119,7 @@ func createStrategy(logger *slog.Logger, strategyType string, virtualNodes int) 
 	case "consistent_hash":
 		return strategy.NewConsistentHashStrategy(virtualNodes), nil
 	case "weighted-round-robin":
-		return strategy.NewWeightedRoundRobinStradegy(), nil
+		return strategy.NewWeightedRoundRobinStrategy(), nil
 	default:
 		logger.Warn("Unkown strategy, defaulting to round-robin", slog.String("requested", strategyType))
 		return strategy.NewRoundRobinStrategy(), nil

@@ -22,9 +22,9 @@ var _ = Describe("LoadBalancer", func() {
 		lb = loadbalancer.NewLoadBalancer(strat)
 
 		backends = []*backend.Backend{
-			backend.New(mustParseURL("http://localhost:8081")),
-			backend.New(mustParseURL("http://localhost:8082")),
-			backend.New(mustParseURL("http://localhost:8083")),
+			backend.New(mustParseURL("http://localhost:8081"), 1),
+			backend.New(mustParseURL("http://localhost:8082"), 1),
+			backend.New(mustParseURL("http://localhost:8083"), 1),
 		}
 	})
 

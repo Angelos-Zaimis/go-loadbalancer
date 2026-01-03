@@ -22,16 +22,16 @@ var _ = Describe("Table-Driven Strategy Tests", func() {
 		Entry("Least Connections", func() strategy.Strategy { return strategy.NewLeastConnStrategy() }),
 		Entry("Least Response Time", func() strategy.Strategy { return strategy.NewLeastResponseStrategy() }),
 		Entry("Consistent Hash with 100 vnodes", func() strategy.Strategy { return strategy.NewConsistentHashStrategy(100) }),
-		Entry("Weighted Round Robin", func() strategy.Strategy { return strategy.NewWeightedRoundRobinStradegy() }),
+		Entry("Weighted Round Robin", func() strategy.Strategy { return strategy.NewWeightedRoundRobinStrategy() }),
 	)
 
 	DescribeTable("All strategies select from healthy backends",
 		func(createStrat func() strategy.Strategy) {
 			strat := createStrat()
 			backends := []*backend.Backend{
-				backend.New(mustParseURLTable("http://localhost:8081")),
-				backend.New(mustParseURLTable("http://localhost:8082")),
-				backend.New(mustParseURLTable("http://localhost:8083")),
+				backend.New(mustParseURLTable("http://localhost:8081"), 1),
+				backend.New(mustParseURLTable("http://localhost:8082"), 1),
+				backend.New(mustParseURLTable("http://localhost:8083"), 1),
 			}
 
 			for _, b := range backends {
@@ -53,8 +53,8 @@ var _ = Describe("Table-Driven Strategy Tests", func() {
 		func(createStrat func() strategy.Strategy) {
 			strat := createStrat()
 			backends := []*backend.Backend{
-				backend.New(mustParseURLTable("http://localhost:8081")),
-				backend.New(mustParseURLTable("http://localhost:8082")),
+				backend.New(mustParseURLTable("http://localhost:8081"), 1),
+				backend.New(mustParseURLTable("http://localhost:8082"), 1),
 			}
 
 			backends[0].SetHealthy(true)

@@ -29,12 +29,25 @@ var _ = Describe("Config", func() {
 		Context("with valid config file", func() {
 			BeforeEach(func() {
 				configContent := `
-ENV: "dev"
-HTTP_ADDR: ":8080"
-LOG_LEVEL: "info"
-HEALTH_CHECK_INTERVAL: "10s"
-STRATEGY: "round-robin"
-BACKENDS: "http://localhost:8081,http://localhost:8082"
+server:
+  address: ":8080"
+  environment: "dev"
+
+health_check:
+  interval: "10s"
+
+strategy:
+  type: "round-robin"
+  virtual_nodes: 100
+
+backends:
+  - url: "http://localhost:8081"
+    weight: 1
+  - url: "http://localhost:8082"
+    weight: 1
+
+logging:
+  level: "info"
 `
 				configPath := filepath.Join(tempDir, "config.yaml")
 				err := os.WriteFile(configPath, []byte(configContent), 0644)
@@ -52,12 +65,12 @@ BACKENDS: "http://localhost:8081,http://localhost:8082"
 
 			It("should parse strategy correctly", func() {
 				cfg, _ := config.Load()
-				Expect(cfg.Strategy).To(Equal("round-robin"))
+				Expect(cfg.Strategy.Type).To(Equal("round-robin"))
 			})
 
 			It("should parse health check interval", func() {
 				cfg, _ := config.Load()
-				Expect(cfg.HealthCheckInterval).To(Equal("10s"))
+				Expect(cfg.HealthCheck.Interval).To(Equal("10s"))
 			})
 		})
 
@@ -70,7 +83,7 @@ BACKENDS: "http://localhost:8081,http://localhost:8082"
 			It("should use defaults when config file missing", func() {
 				cfg, err := config.Load()
 				Expect(err).NotTo(HaveOccurred())
-				Expect(cfg.Strategy).To(Equal("round-robin"))
+				Expect(cfg.Strategy.Type).To(Equal("round-robin"))
 			})
 		})
 	})
