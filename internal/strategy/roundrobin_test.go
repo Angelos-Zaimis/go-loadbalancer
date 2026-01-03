@@ -21,9 +21,9 @@ var _ = Describe("Roundrobin", func() {
 		strat = strategy.NewRoundRobinStrategy()
 
 		backends = []*backend.Backend{
-			backend.New(mustParseURL("http://localhost:8081")),
-			backend.New(mustParseURL("http://localhost:8082")),
-			backend.New(mustParseURL("http://localhost:8083")),
+			backend.New(mustParseURL("http://localhost:8081"), 1),
+			backend.New(mustParseURL("http://localhost:8082"), 1),
+			backend.New(mustParseURL("http://localhost:8083"), 1),
 		}
 
 		for _, b := range backends {
@@ -69,9 +69,9 @@ var _ = Describe("LeastResponse", func() {
 	BeforeEach(func() {
 		strat = strategy.NewLeastResponseStrategy()
 		backends = []*backend.Backend{
-			backend.New(mustParseURL("http://localhost:8081")),
-			backend.New(mustParseURL("http://localhost:8082")),
-			backend.New(mustParseURL("http://localhost:8083")),
+			backend.New(mustParseURL("http://localhost:8081"), 1),
+			backend.New(mustParseURL("http://localhost:8082"), 1),
+			backend.New(mustParseURL("http://localhost:8083"), 1),
 		}
 	})
 
@@ -104,9 +104,9 @@ var _ = Describe("Random", func() {
 	BeforeEach(func() {
 		strat = strategy.NewRandomStrategy()
 		backends = []*backend.Backend{
-			backend.New(mustParseURL("http://localhost:8081")),
-			backend.New(mustParseURL("http://localhost:8082")),
-			backend.New(mustParseURL("http://localhost:8083")),
+			backend.New(mustParseURL("http://localhost:8081"), 1),
+			backend.New(mustParseURL("http://localhost:8082"), 1),
+			backend.New(mustParseURL("http://localhost:8083"), 1),
 		}
 	})
 
@@ -141,21 +141,37 @@ var _ = Describe("WeightedRoundRobin", func() {
 
 	BeforeEach(func() {
 		backends = []*backend.Backend{
-			backend.New(mustParseURL("http://localhost:8081")),
-			backend.New(mustParseURL("http://localhost:8082")),
-			backend.New(mustParseURL("http://localhost:8083")),
+			backend.New(mustParseURL("http://localhost:8081"), 1),
+			backend.New(mustParseURL("http://localhost:8082"), 1),
+			backend.New(mustParseURL("http://localhost:8083"), 1),
 		}
-		strat = strategy.NewWeightedRoundRobinStradegy()
+		strat = strategy.NewWeightedRoundRobinStrategy()
 	})
 
 	It("should create strategy", func() {
 		Expect(strat).NotTo(BeNil())
 	})
 
-	It("should panic when calling SelectBackend (not implemented)", func() {
-		Expect(func() {
-			strat.SelectBackend(backends)
-		}).To(Panic())
+	It("should select backend based on weights", func() {
+		backend := strat.SelectBackend(backends)
+		Expect(backend).NotTo(BeNil())
+		Expect(backends).To(ContainElement(backend))
+	})
+
+	It("should distribute requests proportionally to weights", func() {
+		counts := make(map[*backend.Backend]int)
+		iterations := 100
+
+		for i := 0; i < iterations; i++ {
+			backend := strat.SelectBackend(backends)
+			counts[backend]++
+		}
+
+		// Each backend should receive some requests
+		Expect(len(counts)).To(Equal(3))
+		for _, count := range counts {
+			Expect(count).To(BeNumerically(">", 0))
+		}
 	})
 })
 

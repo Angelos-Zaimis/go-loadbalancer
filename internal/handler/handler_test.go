@@ -34,7 +34,7 @@ var _ = Describe("Handler", func() {
 		}))
 
 		backends = []*backend.Backend{
-			backend.New(mustParseURL(mockBackend1.URL)),
+			backend.New(mustParseURL(mockBackend1.URL), 1),
 		}
 
 		for _, b := range backends {

@@ -21,7 +21,7 @@ var _ = Describe("Backend", func() {
 		var err error
 		testURL, err = url.Parse("http://localhost:8081")
 		Expect(err).NotTo(HaveOccurred())
-		b = backend.New(testURL)
+		b = backend.New(testURL, 1)
 	})
 
 	Describe("New", func() {
@@ -220,7 +220,7 @@ var _ = Describe("Backend", func() {
 
 		It("should handle different URL schemes", func() {
 			httpsURL, _ := url.Parse("https://example.com:443")
-			httpsBackend := backend.New(httpsURL)
+			httpsBackend := backend.New(httpsURL, 1)
 			Expect(httpsBackend.URL().Scheme).To(Equal("https"))
 			Expect(httpsBackend.URL().Host).To(Equal("example.com:443"))
 		})

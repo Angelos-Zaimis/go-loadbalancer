@@ -17,9 +17,9 @@ var _ = Describe("Leastconn", func() {
 	BeforeEach(func() {
 		strat = strategy.NewLeastConnStrategy()
 		backends = []*backend.Backend{
-			backend.New(mustParseURL("http://localhost:8081")),
-			backend.New(mustParseURL("http://localhost:8082")),
-			backend.New(mustParseURL("http://localhost:8083")),
+			backend.New(mustParseURL("http://localhost:8081"), 1),
+			backend.New(mustParseURL("http://localhost:8082"), 1),
+			backend.New(mustParseURL("http://localhost:8083"), 1),
 		}
 		for _, b := range backends {
 			b.SetHealthy(true)

@@ -28,8 +28,10 @@ var _ = Describe("initializeBackends", func() {
 		log = slog.Default()
 		ctx, cancel = context.WithCancel(context.Background())
 		cfg = &config.Config{
-			HealthCheckInterval: "5s",
-			Backends:            []string{},
+			HealthCheck: config.HealthCheckConfig{
+				Interval: "5s",
+			},
+			Backends: []config.BackendConfig{},
 		}
 	})
 
@@ -41,7 +43,7 @@ var _ = Describe("initializeBackends", func() {
 
 	Context("valid backend URLs", func() {
 		It("should initialize single backend", func() {
-			cfg.Backends = []string{"http://localhost:8080"}
+			cfg.Backends = []config.BackendConfig{{URL: "http://localhost:8080", Weight: 1}}
 			backends, err := initializeBackends(ctx, cfg, log)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(backends).To(HaveLen(1))
@@ -49,10 +51,10 @@ var _ = Describe("initializeBackends", func() {
 		})
 
 		It("should initialize multiple backends", func() {
-			cfg.Backends = []string{
-				"http://localhost:8080",
-				"http://localhost:8081",
-				"http://localhost:8082",
+			cfg.Backends = []config.BackendConfig{
+				{URL: "http://localhost:8080", Weight: 1},
+				{URL: "http://localhost:8081", Weight: 1},
+				{URL: "http://localhost:8082", Weight: 1},
 			}
 			backends, err := initializeBackends(ctx, cfg, log)
 			Expect(err).NotTo(HaveOccurred())
@@ -60,14 +62,14 @@ var _ = Describe("initializeBackends", func() {
 		})
 
 		It("should handle HTTPS backends", func() {
-			cfg.Backends = []string{"https://api.example.com"}
+			cfg.Backends = []config.BackendConfig{{URL: "https://api.example.com", Weight: 1}}
 			backends, err := initializeBackends(ctx, cfg, log)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(backends).To(HaveLen(1))
 		})
 
 		It("should handle backends with paths", func() {
-			cfg.Backends = []string{"http://localhost:8080/api/v1"}
+			cfg.Backends = []config.BackendConfig{{URL: "http://localhost:8080/api/v1", Weight: 1}}
 			backends, err := initializeBackends(ctx, cfg, log)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(backends).To(HaveLen(1))
@@ -76,24 +78,24 @@ var _ = Describe("initializeBackends", func() {
 
 	Context("invalid configurations", func() {
 		It("should return error for invalid health check interval", func() {
-			cfg.HealthCheckInterval = "invalid"
-			cfg.Backends = []string{"http://localhost:8080"}
+			cfg.HealthCheck.Interval = "invalid"
+			cfg.Backends = []config.BackendConfig{{URL: "http://localhost:8080", Weight: 1}}
 			backends, err := initializeBackends(ctx, cfg, log)
 			Expect(err).To(HaveOccurred())
 			Expect(backends).To(BeNil())
 		})
 
 		It("should return error when no backends configured", func() {
-			cfg.Backends = []string{}
+			cfg.Backends = []config.BackendConfig{}
 			backends, err := initializeBackends(ctx, cfg, log)
 			Expect(err).To(HaveOccurred())
 			Expect(backends).To(BeNil())
 		})
 
 		It("should skip invalid URLs but continue with valid ones", func() {
-			cfg.Backends = []string{
-				"http://localhost:8080",
-				"http://localhost:8081",
+			cfg.Backends = []config.BackendConfig{
+				{URL: "http://localhost:8080", Weight: 1},
+				{URL: "http://localhost:8081", Weight: 1},
 			}
 			backends, err := initializeBackends(ctx, cfg, log)
 			Expect(err).NotTo(HaveOccurred())
@@ -101,8 +103,8 @@ var _ = Describe("initializeBackends", func() {
 		})
 
 		It("should return error when all URLs are invalid", func() {
-			cfg.Backends = []string{
-				"://invalid",
+			cfg.Backends = []config.BackendConfig{
+				{URL: "://invalid", Weight: 1},
 			}
 			backends, err := initializeBackends(ctx, cfg, log)
 			Expect(err).To(HaveOccurred())
@@ -112,32 +114,32 @@ var _ = Describe("initializeBackends", func() {
 
 	Context("health check intervals", func() {
 		It("should handle different interval formats", func() {
-			cfg.Backends = []string{"http://localhost:8080"}
+			cfg.Backends = []config.BackendConfig{{URL: "http://localhost:8080", Weight: 1}}
 
-			cfg.HealthCheckInterval = "1s"
+			cfg.HealthCheck.Interval = "1s"
 			backends, err := initializeBackends(ctx, cfg, log)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(backends).To(HaveLen(1))
 
-			cfg.HealthCheckInterval = "100ms"
+			cfg.HealthCheck.Interval = "100ms"
 			backends, err = initializeBackends(ctx, cfg, log)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(backends).To(HaveLen(1))
 
-			cfg.HealthCheckInterval = "1m"
+			cfg.HealthCheck.Interval = "1m"
 			backends, err = initializeBackends(ctx, cfg, log)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(backends).To(HaveLen(1))
 
-			cfg.HealthCheckInterval = "500ms"
+			cfg.HealthCheck.Interval = "500ms"
 			backends, err = initializeBackends(ctx, cfg, log)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(backends).To(HaveLen(1))
 		})
 
 		It("should handle hour format", func() {
-			cfg.HealthCheckInterval = "1h"
-			cfg.Backends = []string{"http://localhost:8080"}
+			cfg.HealthCheck.Interval = "1h"
+			cfg.Backends = []config.BackendConfig{{URL: "http://localhost:8080", Weight: 1}}
 			backends, err := initializeBackends(ctx, cfg, log)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(backends).To(HaveLen(1))
