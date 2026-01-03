@@ -70,9 +70,8 @@ curl http://localhost:8080
 
 ## Prerequisites
 
-- Go 1.23+ installed and `go` available on `PATH`.
-- (Optional) `jq` if you want to inspect JSON results on the command line.
-- Docker and Docker Compose for containerized deployment
+- Go 1.25+ (tested with Go 1.25.5)
+- Docker and Docker Compose (optional, for containerized deployment)
 
 ## Quickstart — run locally
 
@@ -107,23 +106,30 @@ Edit `config/config.yaml` to change strategy or backends:
 
 ```yaml
 server:
-  port: ":8080"
-  
+  address: ":8080"
+  environment: "dev"
+
+health_check:
+  interval: "2s"
+
+strategy:
+  type: "round-robin"  # Options: round-robin, least-conn, consistent_hash, random, weighted-round-robin, least-response
+  virtual_nodes: 100    # Only used for consistent_hash
+
 backends:
   - url: "http://localhost:8081"
     weight: 1
   - url: "http://localhost:8082"
     weight: 2
 
-strategy: "round-robin"  # Options: round-robin, least-conn, ip-hash, random, weighted-round-robin, least-response
-
-health_check_interval: "5s"
+logging:
+  level: "info"  # Options: debug, info, warn, error
 ```
 
-Or use environment variables:
+Or use environment variables (using underscore notation for nested keys):
 
 ```bash
-STRATEGY=least-conn PORT=:9000 ./build/load-balancer
+STRATEGY_TYPE=least-conn SERVER_ADDRESS=:9000 ./build/load-balancer
 ```
 
 ## Testing
@@ -193,7 +199,7 @@ make docker-down    # Stop docker-compose environment
 
 **Backend health checks failing**
 - Verify backends are running: `curl http://localhost:8081/health`
-- Check `health_check_interval` in config.yaml (default 5s)
+- Check `health_check.interval` in config.yaml (default 2s)
 - Review logs for connection errors
 
 **Uneven request distribution**
@@ -234,9 +240,9 @@ make docker-down    # Stop docker-compose environment
 │       ├── roundrobin.go
 │       ├── leastconn.go
 │       ├── leastresponse.go
-│       ├── ip-hash.go
+│       ├── consistent_hash.go
 │       ├── random.go
-│       └── weighted-round-robin.go
+│       └── weighted_round_robin.go
 ├── pkg/
 │   └── logger/
 │       └── logger.go        # Structured logging
@@ -292,13 +298,8 @@ and stop that process, or choose a different port range when spawning test backe
 
 ## Next improvements (ideas)
 
-- Add unit tests for each strategy and for `GetNextServer` with mocked backends.
-- Add a histogram (tdigest) to the load-test tool to support very large runs without storing all latencies in memory.
-- Add a `docker-compose.yml` to run the load balancer and five backends in containers for easy CI testing.
-- Add Prometheus metrics endpoint on the load balancer for observability.
-
----
-
-If you'd like, I can also add a simple `docker-compose.yml` that runs the balancer and five backends in containers, or convert the test backends to lightweight Docker images for easier sharing.
-
-Enjoy — and feel free to open issues / PRs on the GitHub repo when you publish it.
+- Add Prometheus metrics endpoint on the load balancer for observability
+- Add histogram (tdigest) to the load-test tool to support very large runs without storing all latencies in memory
+- Add request tracing with OpenTelemetry
+- Implement circuit breaker pattern for failing backends
+- Add support for HTTPS backends with custom CA certificates

@@ -7,7 +7,7 @@ health_check:
   interval: "2s"
 
 strategy:
-  type: "consistent_hash"
+  type: "weighted-round-robin"
   virtual_nodes: 200
 
 backends:
