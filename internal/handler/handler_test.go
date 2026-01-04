@@ -43,7 +43,7 @@ var _ = Describe("Handler", func() {
 
 		strat := strategy.NewRoundRobinStrategy()
 		lb = loadbalancer.NewLoadBalancer(strat)
-		h = handler.NewLoadBalancerHandler(log, lb, backends)
+		h = handler.NewLoadBalancerHandler(log, lb, backends, nil)
 	})
 
 	AfterEach(func() {

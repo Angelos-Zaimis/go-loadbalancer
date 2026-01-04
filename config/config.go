@@ -25,35 +25,29 @@ const (
 	LogLevelError = "error"
 )
 
-// ServerConfig holds server-specific configuration.
 type ServerConfig struct {
 	Address     string `mapstructure:"address"`
 	Environment string `mapstructure:"environment"`
 }
 
-// HealthCheckConfig holds health check configuration.
 type HealthCheckConfig struct {
 	Interval string `mapstructure:"interval"`
 }
 
-// StrategyConfig holds load balancing strategy configuration.
 type StrategyConfig struct {
 	Type         string `mapstructure:"type"`
 	VirtualNodes int    `mapstructure:"virtual_nodes"`
 }
 
-// BackendConfig represents a single backend server configuration.
 type BackendConfig struct {
 	URL    string `mapstructure:"url"`
 	Weight int    `mapstructure:"weight"`
 }
 
-// LoggingConfig holds logging configuration.
 type LoggingConfig struct {
 	Level string `mapstructure:"level"`
 }
 
-// Config holds the application configuration loaded from YAML or environment variables.
 type Config struct {
 	Server      ServerConfig      `mapstructure:"server"`
 	HealthCheck HealthCheckConfig `mapstructure:"health_check"`
@@ -62,8 +56,6 @@ type Config struct {
 	Logging     LoggingConfig     `mapstructure:"logging"`
 }
 
-// Load reads configuration from config.yaml and environment variables.
-// Environment variables take precedence over file configuration.
 func Load() (*Config, error) {
 	viper.SetDefault("server.environment", EnvDev)
 	viper.SetDefault("server.address", ":8080")

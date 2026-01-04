@@ -10,9 +10,6 @@ import (
 	"github.com/angeloszaimis/load-balancer/internal/backend"
 )
 
-// HealthCheck periodically checks if a backend is healthy by sending
-// HTTP GET requests to its /health endpoint. The backend's health status
-// is updated based on the response.
 func HealthCheck(
 	ctx context.Context,
 	backend *backend.Backend,

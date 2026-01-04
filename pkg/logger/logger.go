@@ -6,8 +6,6 @@ import (
 	"strings"
 )
 
-// New creates a structured logger with the specified level and format.
-// Uses JSON format in production, text format otherwise.
 func New(lvl string, addSource bool, enviroment string) *slog.Logger {
 
 	level := parseLevel(lvl)
