@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
+	_ "net/http/pprof"
 	"net/url"
 	"os"
 	"os/signal"
@@ -49,6 +50,14 @@ func main() {
 	lb := loadbalancer.NewLoadBalancer(strat)
 
 	loadBalancerHandler := handler.NewLoadBalancerHandler(log, lb, backends)
+
+	// Start pprof server on separate port for diagnostics
+	go func() {
+		log.Info("Starting pprof server on :6060")
+		if err := http.ListenAndServe(":6060", nil); err != nil {
+			log.Error("pprof server failed", slog.Any("err", err))
+		}
+	}()
 
 	srv, err := httpserver.New(cfg.Server.Address, http.HandlerFunc(loadBalancerHandler.ServeHTTP))
 	if err != nil {
