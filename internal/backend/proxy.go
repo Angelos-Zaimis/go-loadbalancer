@@ -20,6 +20,26 @@ type Backend struct {
 	hasEWMA           bool
 }
 
+type bufferPool struct {
+	pool *sync.Pool
+}
+
+func (bp *bufferPool) Get() []byte {
+	return bp.pool.Get().([]byte)
+}
+
+func (bp *bufferPool) Put(b []byte) {
+    bp.pool.Put(b)
+}
+
+var sharedBufferPool = &bufferPool{
+    pool: &sync.Pool{
+        New: func() interface{} {
+            return make([]byte, 32*1024)
+        },
+    },
+}
+
 const ewmaAlpha = 0.2
 
 // ReverseProxy returns the HTTP reverse proxy for this backend.
@@ -111,9 +131,12 @@ func (b *Backend) Weight() int {
 // New creates a new Backend with the given URL.
 // The backend starts in an unhealthy state until the first health check passes.
 func New(url *url.URL, weight int) *Backend {
+	proxy := httputil.NewSingleHostReverseProxy(url)
+	proxy.BufferPool = sharedBufferPool
+
 	return &Backend{
 		url:       url,
-		proxy:     httputil.NewSingleHostReverseProxy(url),
+		proxy:     proxy,
 		isHealthy: false,
 		weight: weight,
 	}
