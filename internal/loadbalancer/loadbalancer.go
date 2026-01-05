@@ -8,13 +8,11 @@ import (
 	"github.com/angeloszaimis/load-balancer/internal/strategy"
 )
 
-// LoadBalancer coordinates backend selection using pluggable strategies.
 type LoadBalancer struct {
 	strategy strategy.Strategy
 	mutex    sync.Mutex
 }
 
-// NewLoadBalancer creates a new LoadBalancer with the given strategy.
 func NewLoadBalancer(strategy strategy.Strategy) *LoadBalancer {
 	return &LoadBalancer{
 		strategy: strategy,
@@ -22,8 +20,6 @@ func NewLoadBalancer(strategy strategy.Strategy) *LoadBalancer {
 	}
 }
 
-// GetAndReserveServer selects a healthy backend using the configured strategy
-// and atomically increments its connection count.
 func (lb *LoadBalancer) GetAndReserveServer(backends []*backend.Backend) (*backend.Backend, error) {
 	lb.mutex.Lock()
 
@@ -44,8 +40,6 @@ func (lb *LoadBalancer) GetAndReserveServer(backends []*backend.Backend) (*backe
 	return chosen, nil
 }
 
-// GetAndReserveServerWithKey selects a backend using a key (for IP-hash strategies)
-// and atomically reserves it. The key is set and backend is selected under the same lock.
 func (lb *LoadBalancer) GetAndReserveServerWithKey(backends []*backend.Backend, key string) (*backend.Backend, error) {
 	lb.mutex.Lock()
 	defer lb.mutex.Unlock()

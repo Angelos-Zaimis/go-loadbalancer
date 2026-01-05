@@ -11,13 +11,10 @@ import (
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 )
 
-// Server wraps http.Server with validation and graceful shutdown.
 type Server struct {
 	server *http.Server
 }
 
-// New creates a new HTTP server with the given address and handler.
-// The address is validated before creating the server.
 func New(addr string, handler http.Handler) (*Server, error) {
 	if err := validateHost(addr); err != nil {
 		return nil, err
@@ -36,8 +33,6 @@ func New(addr string, handler http.Handler) (*Server, error) {
 	return srv, nil
 }
 
-// Start begins listening for HTTP requests.
-// Returns an error unless the server is shut down cleanly.
 func (s *Server) Start() error {
 	err := s.server.ListenAndServe()
 	if err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -47,7 +42,6 @@ func (s *Server) Start() error {
 	return nil
 }
 
-// Shutdown gracefully shuts down the server with a 5-second timeout.
 func (s *Server) Shutdown(ctx context.Context) error {
 	shutdownCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()

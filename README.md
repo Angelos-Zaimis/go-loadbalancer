@@ -13,7 +13,8 @@ A production-grade HTTP load balancer written in Go. Implements multiple load ba
   - Weighted Round Robin - Distribution based on backend weights
 
 - **Active Health Checking** - Periodic health checks with automatic backend recovery
-- **Graceful Shutdown** - Clean termination with context cancellation
+- **Real-time Metrics** - Channel-based metrics collection with `/metrics` endpoint
+- **Graceful Shutdown** - Clean termination with context cancellation and event draining
 - **Structured Logging** - JSON logging with configurable levels
 - **Configuration** - YAML file or environment variables
 - **Connection Tracking** - Monitor active connections per backend
@@ -161,7 +162,58 @@ make test-race      # Run with race detector
 
 Current test coverage: 76.3%
 
-## Performance Profiling
+## Metrics & Observability
+
+### Real-time Metrics Endpoint
+
+The load balancer exposes a `/metrics` endpoint providing real-time statistics collected via an asynchronous channel-based pipeline:
+
+```bash
+curl http://localhost:8080/metrics | jq
+```
+
+**Sample output:**
+```json
+{
+  "total_requests": 50,
+  "uptime": 10282729208,
+  "backends": {
+    "http://localhost:8081": {
+      "requests": 10,
+      "selections": 10,
+      "healthy": true,
+      "avg_response": 404850,
+      "p50_response": 210167,
+      "p95_response": 1789750,
+      "p99_response": 1789750,
+      "status_codes": {
+        "201": 10
+      }
+    }
+  },
+  "algorithm": "round-robin"
+}
+```
+
+**Metrics Explained:**
+- `total_requests` - Total requests across all backends
+- `uptime` - Nanoseconds since start (divide by 1e9 for seconds)
+- `algorithm` - Current load balancing strategy in use
+- `requests` - Number of requests handled by this backend
+- `selections` - Times the strategy selected this backend
+- `healthy` - Current health check status
+- `avg_response` - Mean response time in nanoseconds
+- `p50_response`, `p95_response`, `p99_response` - Latency percentiles (50th, 95th, 99th)
+- `status_codes` - HTTP status code distribution
+
+**Architecture:**
+- Asynchronous event collection via buffered channels (1000 events)
+- Non-blocking event emission (drops events under extreme load)
+- Single-goroutine processing for consistent metrics
+- Graceful shutdown with event draining
+- Uses `sync.RWMutex` for concurrent-safe metric reads
+
+### Performance Profiling
 
 The load balancer exposes pprof endpoints for CPU and memory profiling:
 
@@ -243,6 +295,11 @@ make docker-down    # Stop docker-compose environment
 - Change port in config.yaml or set PORT env var
 - Kill existing process: `lsof -ti:8080 | xargs kill`
 
+**Metrics show zero values**
+- Ensure requests are being sent after load balancer starts
+- Check that `/metrics` endpoint is accessible
+- Verify metrics collector is initialized in main.go
+
 ## Project Structure
 
 ```
@@ -255,13 +312,17 @@ make docker-down    # Stop docker-compose environment
 │   ├── backend/
 │   │   └── proxy.go         # Reverse proxy per backend
 │   ├── handler/
-│   │   └── handler.go       # HTTP request handler
+│   │   └── handler.go       # HTTP request handler with metrics emission
 │   ├── healthcheck/
 │   │   └── healthcheck.go   # Health check runner
 │   ├── httpserver/
 │   │   └── server.go        # HTTP server wrapper
 │   ├── loadbalancer/
 │   │   └── loadbalancer.go  # Main LB coordinator
+│   ├── metrics/
+│   │   ├── collector.go     # Channel-based event collector
+│   │   ├── metrics.go       # Metrics storage and aggregation
+│   │   └── handler.go       # /metrics HTTP endpoint
 │   └── strategy/
 │       ├── strategy.go      # Strategy interface
 │       ├── roundrobin.go

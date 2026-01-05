@@ -17,6 +17,7 @@ import (
 	"github.com/angeloszaimis/load-balancer/internal/healthcheck"
 	"github.com/angeloszaimis/load-balancer/internal/httpserver"
 	"github.com/angeloszaimis/load-balancer/internal/loadbalancer"
+	"github.com/angeloszaimis/load-balancer/internal/metrics"
 	"github.com/angeloszaimis/load-balancer/internal/strategy"
 	"github.com/angeloszaimis/load-balancer/pkg/logger"
 )
@@ -49,7 +50,10 @@ func main() {
 
 	lb := loadbalancer.NewLoadBalancer(strat)
 
-	loadBalancerHandler := handler.NewLoadBalancerHandler(log, lb, backends)
+	metricsCollector := metrics.NewCollector(1000, log)
+	metricsCollector.Start(ctx)
+
+	loadBalancerHandler := handler.NewLoadBalancerHandler(log, lb, backends, metricsCollector)
 
 	// Start pprof server on separate port for diagnostics
 	go func() {
@@ -59,7 +63,9 @@ func main() {
 		}
 	}()
 
-	srv, err := httpserver.New(cfg.Server.Address, http.HandlerFunc(loadBalancerHandler.ServeHTTP))
+	router := setupRouter(loadBalancerHandler, metricsCollector, cfg.Strategy.Type)
+
+	srv, err := httpserver.New(cfg.Server.Address, router)
 	if err != nil {
 		log.Error("Failed to create server", slog.Any("err", err))
 		os.Exit(1)
