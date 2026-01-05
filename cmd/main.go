@@ -63,12 +63,9 @@ func main() {
 		}
 	}()
 
-	api := http.NewServeMux()
+	router := setupRouter(loadBalancerHandler, metricsCollector, cfg.Strategy.Type)
 
-	api.HandleFunc("/", loadBalancerHandler.ServeHTTP)
-	api.HandleFunc("/metrics", metricsCollector.Handler(cfg.Strategy.Type))
-
-	srv, err := httpserver.New(cfg.Server.Address, api)
+	srv, err := httpserver.New(cfg.Server.Address, router)
 	if err != nil {
 		log.Error("Failed to create server", slog.Any("err", err))
 		os.Exit(1)
