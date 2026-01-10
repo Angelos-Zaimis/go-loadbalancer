@@ -19,7 +19,7 @@ help:
 # Build binary
 build:
 	@echo "Building load-balancer..."
-	@go build -o build/load-balancer cmd/main.go
+	@go build -o build/load-balancer ./cmd/
 	@echo "Binary created at build/load-balancer"
 
 # Run tests
