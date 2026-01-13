@@ -5,6 +5,7 @@
 //
 //	go run loadtest.go -url http://localhost:8080/create-course -concurrency 10 -requests 1000
 //	go run loadtest.go -url http://localhost:8080 -concurrency 50 -requests 5000 -csv results.csv -out summary.json
+//	go run loadtest.go -url http://localhost:8080 -kill-port 8081 -kill-after 50 # Test circuit breaker
 //
 // Features:
 //   - Concurrent workers for high throughput testing
@@ -12,6 +13,7 @@
 //   - CSV output with per-request details
 //   - JSON summary with percentiles (p50, p90, p95, p99)
 //   - Fake IP distribution via X-Forwarded-For header for IP-hash strategy testing
+//   - Circuit breaker testing: kill a backend mid-test to verify retry behavior
 package main
 
 import (
@@ -23,8 +25,10 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"runtime"
 	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -39,6 +43,9 @@ func main() {
 		body        = flag.String("body", `{"title":"T","description":"d"}`, "Request body")
 		contentType = flag.String("content-type", "application/json", "Content-Type header")
 		timeoutSec  = flag.Int("timeout", 10, "Per-request timeout in seconds")
+		// Circuit breaker testing
+		killPort  = flag.Int("kill-port", 0, "Kill backend on this port mid-test (0 = disabled)")
+		killAfter = flag.Int("kill-after", 50, "Kill backend after this many requests")
 	)
 
 	outJSON := flag.String("out", "", "Write JSON summary to this file (optional)")
@@ -90,12 +97,25 @@ func main() {
 
 	testStart := time.Now()
 
+	// Track if we've killed the backend yet
+	var backendKilled int32
+
 	// worker
 	for i := 0; i < *concurrency; i++ {
 		wg.Add(1)
 		go func(workerID int) {
 			defer wg.Done()
 			for idx := range jobs {
+				// Circuit breaker test: kill backend at specified request count
+				if *killPort > 0 && idx == *killAfter && atomic.CompareAndSwapInt32(&backendKilled, 0, 1) {
+					fmt.Printf("\n🔥 [Circuit Breaker Test] Killing backend on port %d at request %d...\n", *killPort, idx)
+					if err := killBackendOnPort(*killPort); err != nil {
+						fmt.Printf("⚠️  Warning: Could not kill backend: %v\n", err)
+					} else {
+						fmt.Printf("✓ Backend on port %d killed - retry and circuit breaker should activate\n\n", *killPort)
+					}
+				}
+
 				atomic.AddInt32(&total, 1)
 				start := time.Now()
 
@@ -356,4 +376,22 @@ func main() {
 	if failure > 0 {
 		os.Exit(2)
 	}
+}
+
+// killBackendOnPort kills the process listening on the specified port.
+// Used for circuit breaker testing.
+func killBackendOnPort(port int) error {
+	cmd := exec.Command("lsof", "-ti", fmt.Sprintf(":%d", port))
+	output, err := cmd.Output()
+	if err != nil {
+		return fmt.Errorf("no process found on port %d", port)
+	}
+
+	pid := strings.TrimSpace(string(output))
+	if pid == "" {
+		return fmt.Errorf("no process found on port %d", port)
+	}
+
+	killCmd := exec.Command("kill", pid)
+	return killCmd.Run()
 }
