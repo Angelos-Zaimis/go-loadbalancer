@@ -13,6 +13,7 @@ import (
 
 	"github.com/angeloszaimis/load-balancer/config"
 	"github.com/angeloszaimis/load-balancer/internal/backend"
+	"github.com/angeloszaimis/load-balancer/internal/circuitbreaker"
 	"github.com/angeloszaimis/load-balancer/internal/handler"
 	"github.com/angeloszaimis/load-balancer/internal/healthcheck"
 	"github.com/angeloszaimis/load-balancer/internal/httpserver"
@@ -53,7 +54,20 @@ func main() {
 	metricsCollector := metrics.NewCollector(1000, log)
 	metricsCollector.Start(ctx)
 
-	loadBalancerHandler := handler.NewLoadBalancerHandler(log, lb, backends, metricsCollector)
+	var cbRegistry *circuitbreaker.Registry
+	if cfg.CircuitBreaker.Enabled {
+		resetTimeout, err := time.ParseDuration(cfg.CircuitBreaker.ResetTimeout)
+		if err != nil {
+			log.Error("Invalid circuit breaker reset timeout", slog.Any("err", err))
+			os.Exit(1)
+		}
+		cbRegistry = circuitbreaker.NewRegistry(cfg.CircuitBreaker.FailureThreshold, resetTimeout)
+		log.Info("Circuit breaker enabled",
+			slog.Int("failure_threshold", cfg.CircuitBreaker.FailureThreshold),
+			slog.String("reset_timeout", cfg.CircuitBreaker.ResetTimeout))
+	}
+
+	loadBalancerHandler := handler.NewLoadBalancerHandler(log, lb, backends, metricsCollector, cbRegistry, cfg.Retry.MaxRetries)
 
 	// Start pprof server on separate port for diagnostics
 	go func() {
