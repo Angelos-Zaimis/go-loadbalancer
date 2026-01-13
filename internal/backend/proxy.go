@@ -1,6 +1,8 @@
 package backend
 
 import (
+	"context"
+	"net/http"
 	"net/http/httputil"
 	"net/url"
 	"sync"
@@ -16,6 +18,14 @@ type Backend struct {
 	weight            int
 	ewmaResponseTime  time.Duration
 	hasEWMA           bool
+}
+
+type proxyErrorKeyType struct {}
+
+var proxyErrorKey = proxyErrorKeyType{}
+
+type ProxyError struct {
+	Err        error
 }
 
 const ewmaAlpha = 0.2
@@ -113,10 +123,22 @@ func (b *Backend) Weight() int {
 	return b.weight
 }
 
+func WithProxyErrorCapture(r *http.Request) (*http.Request, *ProxyError) {
+	pe := &ProxyError{}
+	ctx := context.WithValue(r.Context(), proxyErrorKey, pe)
+	return r.WithContext(ctx), pe
+}
+
 func New(url *url.URL, weight int) *Backend {
 	proxy := httputil.NewSingleHostReverseProxy(url)
 	proxy.BufferPool = sharedBufferPool
 
+	proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
+		
+		if pe, ok := r.Context().Value(proxyErrorKey).(*ProxyError); ok {
+			pe.Err = err
+		}
+	}
 	return &Backend{
 		url:       url,
 		proxy:     proxy,

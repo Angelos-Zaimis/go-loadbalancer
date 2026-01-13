@@ -48,12 +48,24 @@ type LoggingConfig struct {
 	Level string `mapstructure:"level"`
 }
 
+type CircuitBreakerConfig struct {
+	Enabled          bool   `mapstructure:"enabled"`
+	FailureThreshold int    `mapstructure:"failure_threshold"`
+	ResetTimeout     string `mapstructure:"reset_timeout"`
+}
+
+type RetryConfig struct {
+	MaxRetries int `mapstructure:"max_retries"`
+}
+
 type Config struct {
-	Server      ServerConfig      `mapstructure:"server"`
-	HealthCheck HealthCheckConfig `mapstructure:"health_check"`
-	Strategy    StrategyConfig    `mapstructure:"strategy"`
-	Backends    []BackendConfig   `mapstructure:"backends"`
-	Logging     LoggingConfig     `mapstructure:"logging"`
+	Server         ServerConfig         `mapstructure:"server"`
+	HealthCheck    HealthCheckConfig    `mapstructure:"health_check"`
+	Strategy       StrategyConfig       `mapstructure:"strategy"`
+	Backends       []BackendConfig      `mapstructure:"backends"`
+	Logging        LoggingConfig        `mapstructure:"logging"`
+	CircuitBreaker CircuitBreakerConfig `mapstructure:"circuit_breaker"`
+	Retry          RetryConfig          `mapstructure:"retry"`
 }
 
 func Load() (*Config, error) {
@@ -63,6 +75,10 @@ func Load() (*Config, error) {
 	viper.SetDefault("strategy.type", "round-robin")
 	viper.SetDefault("strategy.virtual_nodes", 100)
 	viper.SetDefault("logging.level", LogLevelInfo)
+	viper.SetDefault("circuit_breaker.enabled", true)
+	viper.SetDefault("circuit_breaker.failure_threshold", 5)
+	viper.SetDefault("circuit_breaker.reset_timeout", "30s")
+	viper.SetDefault("retry.max_retries", 2)
 
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
