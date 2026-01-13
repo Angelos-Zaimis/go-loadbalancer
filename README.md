@@ -12,6 +12,7 @@ A production-grade HTTP load balancer written in Go. Implements multiple load ba
   - Consistent Hashing - Session affinity using IP hashing
   - Weighted Round Robin - Distribution based on backend weights
 
+- **Circuit Breaker & Retry** - Automatic retry on failure with circuit breaker pattern for failing backends
 - **Active Health Checking** - Periodic health checks with automatic backend recovery
 - **Real-time Metrics** - Channel-based metrics collection with `/metrics` endpoint
 - **Graceful Shutdown** - Clean termination with context cancellation and event draining
@@ -127,6 +128,14 @@ backends:
 
 logging:
   level: "info"  # Options: debug, info, warn, error
+
+circuit_breaker:
+  enabled: true
+  failure_threshold: 5    # Failures before circuit opens
+  reset_timeout: "30s"    # Time before trying again
+
+retry:
+  max_retries: 2          # Retries for idempotent requests (GET, PUT, DELETE)
 ```
 
 Or use environment variables (using underscore notation for nested keys):
@@ -212,6 +221,38 @@ curl http://localhost:8080/metrics | jq
 - Single-goroutine processing for consistent metrics
 - Graceful shutdown with event draining
 - Uses `sync.RWMutex` for concurrent-safe metric reads
+
+### Circuit Breaker & Retry
+
+The load balancer implements the circuit breaker pattern with automatic retry for improved reliability:
+
+**How it works:**
+1. When a request to a backend fails, it's automatically retried on a different backend (for idempotent methods: GET, PUT, DELETE, HEAD, OPTIONS, TRACE)
+2. Failures are tracked per-backend in a circuit breaker
+3. After 5 consecutive failures (configurable), the circuit "opens" and requests skip that backend
+4. After the reset timeout (30s default), the circuit enters "half-open" state and allows a probe request
+5. If the probe succeeds, the circuit closes and normal traffic resumes
+
+**Circuit Breaker States:**
+- `CLOSED` - Normal operation, requests flow through
+- `OPEN` - Backend is failing, requests are rejected immediately
+- `HALF-OPEN` - Testing if backend recovered with probe requests
+
+**Test the circuit breaker:**
+
+```bash
+# Run comparison test (with vs without circuit breaker)
+go run scripts/cbcompare.go -requests 60 -kill-after 25
+
+# Results are saved to scripts/circuit_breaker_results.md
+cat scripts/circuit_breaker_results.md
+```
+
+**Sample test results:**
+| Configuration | Success Rate | Failed |
+|--------------|-------------|--------|
+| With Circuit Breaker + Retry | 100% | 0 |
+| Without | 88.3% | 7 |
 
 ### Performance Profiling
 
@@ -310,9 +351,12 @@ make docker-down    # Stop docker-compose environment
 │   └── config.yaml          # Default config
 ├── internal/
 │   ├── backend/
-│   │   └── proxy.go         # Reverse proxy per backend
+│   │   └── proxy.go         # Reverse proxy per backend with error capture
+│   ├── circuitbreaker/
+│   │   ├── breaker.go       # Circuit breaker state machine
+│   │   └── registry.go      # Per-backend circuit breaker registry
 │   ├── handler/
-│   │   └── handler.go       # HTTP request handler with metrics emission
+│   │   └── handler.go       # HTTP request handler with retry logic
 │   ├── healthcheck/
 │   │   └── healthcheck.go   # Health check runner
 │   ├── httpserver/
@@ -339,6 +383,8 @@ make docker-down    # Stop docker-compose environment
     ├── spawn_backends.sh    # Start test backends
     ├── stop_backends.sh     # Stop test backends
     ├── loadtest.go          # Load testing tool
+    ├── cbcompare.go         # Circuit breaker comparison test
+    ├── cbtest.go            # Circuit breaker manual test
     └── check_results.go     # Verify test results
 ```
 
@@ -389,5 +435,6 @@ and stop that process, or choose a different port range when spawning test backe
 - Add Prometheus metrics endpoint on the load balancer for observability
 - Add histogram (tdigest) to the load-test tool to support very large runs without storing all latencies in memory
 - Add request tracing with OpenTelemetry
-- Implement circuit breaker pattern for failing backends
 - Add support for HTTPS backends with custom CA certificates
+- Add rate limiting per client IP
+- Implement sticky sessions with cookies
